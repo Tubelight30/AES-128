@@ -380,7 +380,7 @@ def decrypt(cipher_hex:str, keys:list)->str:
     
     print(currStateMat)
     
-    for round in range(1,2):
+    for round in range(1,10):
         
         currStateMat[1] = currStateMat[1][3:] + currStateMat[1][:3]
         currStateMat[2] = currStateMat[2][2:]+ currStateMat[2][:2]
@@ -398,6 +398,84 @@ def decrypt(cipher_hex:str, keys:list)->str:
         
         printWords(currStateMat)
         
+        #! add round key
+        keyMat = createState(keys[round])
+        xorRound = ""
+        for i in range(4):
+            for j in range(4):
+                xorRound += bin2hex(xor_binary(hex2bin(currStateMat[j][i]),hex2bin(keyMat[j][i])))
+
+
+        currStateMat = createState(xorRound)
+        printWords(currStateMat)
+        
+        
+        #! mix column
+        #! not standard integer multiplication. We have to Galois Field
+        #! we have to use irreducible polynomial x8+x4+x3+x+1(or 0x11B in hexadecimal)
+        newStateMat = [
+            ["00","00","00","00"],
+            ["00","00","00","00"],
+            ["00","00","00","00"],
+            ["00","00","00","00"],
+        ]
+        for outer in range(len(INV_MIX_COL_CONST)):
+            for middle in range(len(currStateMat[0])):
+                for inner in range(len(currStateMat)):
+                    #! result[i][middle] += A[i][inner] * B[inner][middle]
+                    ans = "00000000"
+                    P1 = hex2bin(INV_MIX_COL_CONST[outer][inner])
+                    P2 = hex2bin(currStateMat[inner][middle])
+                    
+                    partial_results = [P2]
+                    index = len(P1)-P1.find("1")-1;
+                    
+                    for i in range(1,index+1):
+                        temp = partial_results[i-1]
+                        if(temp[0] == '1'):
+                            temp  = temp+"0"
+                            temp = xor_binary(temp,"100011011")
+                            temp = temp[1:]
+                        else:
+                            temp = temp[1:]+"0"
+                        partial_results.append(temp)
+                    
+                    for i in range(len(P1)):
+                        if(P1[i] == "1"):
+                            ans = xor_binary(partial_results[len(P1)-i-1],ans)
+                        
+                    newStateMat[outer][middle] = bin2hex(xor_binary(hex2bin(newStateMat[outer][middle]),ans))
+        # printWords(newStateMat)
+        currStateMat = newStateMat
+    
+    currStateMat[1] = currStateMat[1][3:] + currStateMat[1][:3]
+    currStateMat[2] = currStateMat[2][2:]+ currStateMat[2][:2]
+    currStateMat[3] = currStateMat[3][1:]+ currStateMat[3][:1]
+    print(currStateMat)
+    
+    #! Subbytes
+    for r in range(4):
+        for c in range(4):
+            binary_byte = hex2bin(currStateMat[r][c])
+            row = int(binary_byte[0:4],2)
+            col = int(binary_byte[4:],2)
+            s_hex_val = INV_AES_S_BOX[row][col]
+            currStateMat[r][c] = s_hex_val
+    
+    printWords(currStateMat)
+    
+    #! add round key
+    keyMat = createState(keys[10])
+    xorRound = ""
+    for i in range(4):
+        for j in range(4):
+            xorRound += bin2hex(xor_binary(hex2bin(currStateMat[j][i]),hex2bin(keyMat[j][i])))
+
+
+    currStateMat = createState(xorRound)
+    printWords(currStateMat)
+    
+    
         
         
 
