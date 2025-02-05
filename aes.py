@@ -211,9 +211,9 @@ def roundkeygen(key_hex:str) -> list:
         
     return roundKeys
 
-def encrypt(plain_hex: str, keys:list):
+def encrypt(plain_hex: str, keys:list) -> str:
     print('ehho')
-    
+
     #! round 0
     stateMat0 = createState(plain_hex)
     keyMat = createState(keys[0])
@@ -221,12 +221,12 @@ def encrypt(plain_hex: str, keys:list):
     for i in range(4):
         for j in range(4):
             xorRound0 += bin2hex(xor_binary(hex2bin(stateMat0[j][i]),hex2bin(keyMat[j][i])))
-            
+
     currStateMat = createState(xorRound0)
-    
+
     for round in range(1,10):
         #! Round 1 to n
-        
+
         #! Subbytes
         for r in range(4):
             for c in range(4):
@@ -242,7 +242,7 @@ def encrypt(plain_hex: str, keys:list):
         currStateMat[3] = currStateMat[3][3:]+ currStateMat[3][:3]
         #! mix column
         #! not standard integer multiplication. We have to Galois Field
-        #! we have to use irreducible polynomial x8+x4+x3+x+1(or 0x11B in hexadecimal)
+        #! we have to use irreducible polynomial x8+x4+x3+x+1(or 0x11Bin hexadecimal)
         newStateMat = [
             ["00","00","00","00"],
             ["00","00","00","00"],
@@ -256,7 +256,7 @@ def encrypt(plain_hex: str, keys:list):
                     ans = 0
                     if(MIX_COL_CONST[i][k] == "01"):
                         ans = hex2bin(currStateMat[k][j])
-                    
+
                     elif(MIX_COL_CONST[i][k] == "02"):
                         bin_byte1 = hex2bin(currStateMat[k][j])
                         temp = ""
@@ -280,24 +280,53 @@ def encrypt(plain_hex: str, keys:list):
                         else:
                             bin_byte1 = bin_byte1[1:]+"0"
                             temp = bin_byte1
-                        
+
                         ans = xor_binary(hex2bin(currStateMat[k][j]),temp)
-                    
+
                     newStateMat[i][j] = bin2hex(xor_binary(hex2bin(newStateMat[i][j]),ans))
         # print(newStateMat)
         currStateMat = newStateMat
-        
+
         #! add round key
         keyMat = createState(keys[round])
         xorRound = ""
         for i in range(4):
             for j in range(4):
                 xorRound += bin2hex(xor_binary(hex2bin(currStateMat[j][i]),hex2bin(keyMat[j][i])))
-        
-        
+
+
         currStateMat = createState(xorRound)
         print(currStateMat)
-        
+    
+    for r in range(4):
+            for c in range(4):
+                binary_byte = hex2bin(currStateMat[r][c])
+                row = int(binary_byte[0:4],2)
+                col = int(binary_byte[4:],2)
+                s_hex_val = AES_S_BOX[row][col]
+                currStateMat[r][c] = s_hex_val
+
+        #! Shift Row
+    currStateMat[1] = currStateMat[1][1:]+ currStateMat[1][:1]
+    currStateMat[2] = currStateMat[2][2:]+ currStateMat[2][:2]
+    currStateMat[3] = currStateMat[3][3:]+ currStateMat[3][:3]
+
+    keyMat = createState(keys[10])
+    xorRound = ""
+    for i in range(4):
+        for j in range(4):
+            xorRound += bin2hex(xor_binary(hex2bin(currStateMat[j][i]),hex2bin(keyMat[j][i])))
+
+    currStateMat = createState(xorRound)
+    print(currStateMat)
+    
+    cipher = ""
+    for i in range(4):
+        for j in range(4):
+            cipher += currStateMat[j][i]
+    
+    return cipher
+
 
 key = "Thats my Kung Fu"
 print("Key in hexadecimal:", str2hex(key))
@@ -311,25 +340,5 @@ plainState = createState(plain_hex)
 keyState = createState(key_hex)
 
 keys = roundkeygen(key_hex)
-encrypt(plain_hex,keys)
-
-# a = 2;
-# print(bin(a))
-testing = xor_binary("00000000","10001011")
-# print(len(testing))
-print(testing)
-# testing = testing[1:]
-# print(testing)
-
-bin_byte1 = hex2bin("2F")
-temp = ""
-# shift left 2
-if(bin_byte1[0] == '1'):
-    bin_byte1  = bin_byte1+"0"
-    temp = xor_binary(bin_byte1,"100011011")
-    temp = temp[1:]
-else:
-    bin_byte1 = bin_byte1[1:]+"0"
-    temp = bin_byte1
-ans = xor_binary(hex2bin("2F"),temp)
-print(ans)
+ciphertext = encrypt(plain_hex,keys)
+print(ciphertext)
