@@ -154,6 +154,8 @@ def multiply_binary(bin_str1: str, bin_str2: str) -> str:
  #ascii to hex
 def str2hex(s):
     return s.encode().hex().upper()
+def hex2str(s):
+    return bytes.fromhex(s).decode()
 
 def printWords(stateMat: list)->str:
     temp = ""
@@ -333,7 +335,7 @@ def encrypt(plain_hex: str, keys:list) -> str:
 
 
         currStateMat = createState(xorRound)
-        print(currStateMat)
+        # print(currStateMat)
     
     for r in range(4):
             for c in range(4):
@@ -355,7 +357,7 @@ def encrypt(plain_hex: str, keys:list) -> str:
             xorRound += bin2hex(xor_binary(hex2bin(currStateMat[j][i]),hex2bin(keyMat[j][i])))
 
     currStateMat = createState(xorRound)
-    print(currStateMat)
+    # print(currStateMat)
     
     cipher = ""
     for i in range(4):
@@ -396,7 +398,7 @@ def decrypt(cipher_hex:str, keys:list)->str:
                 s_hex_val = INV_AES_S_BOX[row][col]
                 currStateMat[r][c] = s_hex_val
         
-        printWords(currStateMat)
+        # printWords(currStateMat)
         
         #! add round key
         keyMat = createState(keys[round])
@@ -407,7 +409,7 @@ def decrypt(cipher_hex:str, keys:list)->str:
 
 
         currStateMat = createState(xorRound)
-        printWords(currStateMat)
+        # printWords(currStateMat)
         
         
         #! mix column
@@ -451,7 +453,7 @@ def decrypt(cipher_hex:str, keys:list)->str:
     currStateMat[1] = currStateMat[1][3:] + currStateMat[1][:3]
     currStateMat[2] = currStateMat[2][2:]+ currStateMat[2][:2]
     currStateMat[3] = currStateMat[3][1:]+ currStateMat[3][:1]
-    print(currStateMat)
+    # print(currStateMat)
     
     #! Subbytes
     for r in range(4):
@@ -462,7 +464,7 @@ def decrypt(cipher_hex:str, keys:list)->str:
             s_hex_val = INV_AES_S_BOX[row][col]
             currStateMat[r][c] = s_hex_val
     
-    printWords(currStateMat)
+    # printWords(currStateMat)
     
     #! add round key
     keyMat = createState(keys[10])
@@ -473,7 +475,13 @@ def decrypt(cipher_hex:str, keys:list)->str:
 
 
     currStateMat = createState(xorRound)
-    printWords(currStateMat)
+    
+    plain = ""
+    for i in range(4):
+        for j in range(4):
+            plain += currStateMat[j][i]
+    
+    return plain
     
     
         
@@ -482,16 +490,15 @@ def decrypt(cipher_hex:str, keys:list)->str:
 key = "Thats my Kung Fu"
 print("Key in hexadecimal:", str2hex(key))
 plain = "Two One Nine Two"
-print("Plain: ",str2hex(plain))
+print("Plain: ", str2hex(plain))
 
 plain_hex = str2hex(plain)
 key_hex = str2hex(key)
 
-plainState = createState(plain_hex)
-keyState = createState(key_hex)
-
 keys = roundkeygen(key_hex)
+
 ciphertext = encrypt(plain_hex,keys)
 print(ciphertext)
 
-decrypt(ciphertext,keys)
+plaintext = decrypt(ciphertext,keys)
+print(hex2str(plaintext))
