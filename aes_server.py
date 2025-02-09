@@ -1,3 +1,4 @@
+import socket
 AES_S_BOX = [
     ["63", "7C", "77", "7B", "F2", "6B", "6F", "C5", "30", "01", "67", "2B", "FE", "D7", "AB", "76"],
     ["CA", "82", "C9", "7D", "FA", "59", "47", "F0", "AD", "D4", "A2", "AF", "9C", "A4", "72", "C0"],
@@ -36,8 +37,6 @@ INV_AES_S_BOX = [
     ["17", "2B", "04", "7E", "BA", "77", "D6", "26", "E1", "69", "14", "63", "55", "21", "0C", "7D"]
 ]
 
-
-# Define the AES round constants as lists of hex string bytes.
 ROUND_CONST = [
     ["01", "00", "00", "00"],
     ["02", "00", "00", "00"],
@@ -163,7 +162,7 @@ def printWords(stateMat: list)->str:
         for j in range(4):
             temp += stateMat[j][i]
         temp+=" "
-    print(temp)
+    # print(temp)
     
 
 def createState(text_hex:str) -> list:
@@ -251,7 +250,6 @@ def roundkeygen(key_hex:str) -> list:
     return roundKeys
 
 def encrypt(plain_hex: str, keys:list) -> str:
-    print('ehho')
 
     #! round 0
     stateMat0 = createState(plain_hex)
@@ -380,14 +378,11 @@ def decrypt(cipher_hex:str, keys:list)->str:
 
     currStateMat = createState(xorRound0)
     
-    print(currStateMat)
-    
     for round in range(1,10):
         
         currStateMat[1] = currStateMat[1][3:] + currStateMat[1][:3]
         currStateMat[2] = currStateMat[2][2:]+ currStateMat[2][:2]
         currStateMat[3] = currStateMat[3][1:]+ currStateMat[3][:1]
-        print(currStateMat)
         
         #! Subbytes
         for r in range(4):
@@ -484,21 +479,27 @@ def decrypt(cipher_hex:str, keys:list)->str:
     return plain
     
     
-        
-        
+server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+server_socket.bind(('localhost', 12345))
+server_socket.listen(1)
 
-key = "Thats my Kung Fu"
-print("Key in hexadecimal:", str2hex(key))
-plain = "Two One Nine Two"
-print("Plain: ", str2hex(plain))
+conn, addr = server_socket.accept()
+print(f"Connection established with {addr}")
 
-plain_hex = str2hex(plain)
-key_hex = str2hex(key)
+# while True:
+encrypted_message = conn.recv(1024).decode()
 
-keys = roundkeygen(key_hex)
+print(f"Encrypted message received from client: {encrypted_message}")
+key = input("Enter the key to decrypt the message: ").strip()
+keys = roundkeygen(str2hex(key))
+plaintext = decrypt(encrypted_message, keys)
+print(f"Decrypted message: {hex2str(plaintext)}")
 
-ciphertext = encrypt(plain_hex,keys)
-print(ciphertext)
+reply = input("Enter reply to send to client: ").strip()
 
-plaintext = decrypt(ciphertext,keys)
-print(hex2str(plaintext))
+reply_cipher = encrypt(str2hex(reply), keys)
+conn.sendall((reply_cipher).encode())
+print(f"Encrypted reply sent to client: {reply_cipher}")
+
+conn.close()
+server_socket.close()
