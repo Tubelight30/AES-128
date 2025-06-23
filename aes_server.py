@@ -156,6 +156,66 @@ def str2hex(s):
 def hex2str(s):
     return bytes.fromhex(s).decode()
 
+# PKCS#7 Padding functions for handling arbitrary length messages
+def pkcs7_pad(data: bytes, block_size: int = 16) -> bytes:
+    """Add PKCS#7 padding to data to make it a multiple of block_size"""
+    padding_length = block_size - (len(data) % block_size)
+    padding = bytes([padding_length] * padding_length)
+    return data + padding
+
+def pkcs7_unpad(data: bytes) -> bytes:
+    """Remove PKCS#7 padding from data"""
+    if not data:
+        raise ValueError("Cannot unpad empty data")
+    padding_length = data[-1]
+    if padding_length > len(data) or padding_length == 0:
+        raise ValueError("Invalid padding")
+    # Verify all padding bytes are correct
+    for i in range(padding_length):
+        if data[-(i+1)] != padding_length:
+            raise ValueError("Invalid padding")
+    return data[:-padding_length]
+
+# Multi-block encryption/decryption functions
+def encrypt_multi_block(plaintext: str, key: str) -> str:
+    """Encrypt plaintext of any length using AES-128 ECB mode"""
+    # Convert plaintext to bytes and apply padding
+    plaintext_bytes = plaintext.encode('utf-8')
+    padded_data = pkcs7_pad(plaintext_bytes)
+    
+    # Generate round keys
+    keys = roundkeygen(str2hex(key))
+    
+    # Process each 16-byte block
+    ciphertext_hex = ""
+    for i in range(0, len(padded_data), 16):
+        block = padded_data[i:i+16]
+        block_hex = block.hex().upper()
+        encrypted_block = encrypt(block_hex, keys)
+        ciphertext_hex += encrypted_block
+    
+    return ciphertext_hex
+
+def decrypt_multi_block(ciphertext_hex: str, key: str) -> str:
+    """Decrypt ciphertext of any length using AES-128 ECB mode"""
+    # Generate round keys
+    keys = roundkeygen(str2hex(key))
+    
+    # Process each 32-character hex block (16 bytes)
+    decrypted_blocks = []
+    for i in range(0, len(ciphertext_hex), 32):
+        block_hex = ciphertext_hex[i:i+32]
+        decrypted_block_hex = decrypt(block_hex, keys)
+        decrypted_blocks.append(bytes.fromhex(decrypted_block_hex))
+    
+    # Combine all blocks
+    decrypted_data = b''.join(decrypted_blocks)
+    
+    # Remove padding
+    unpadded_data = pkcs7_unpad(decrypted_data)
+    
+    return unpadded_data.decode('utf-8')
+
 def printWords(stateMat: list)->str:
     temp = ""
     for i in range(4):
@@ -479,6 +539,19 @@ def decrypt(cipher_hex:str, keys:list)->str:
     return plain
     
     
+# Helper function for key adjustment
+def adjust_key_length(key: str) -> str:
+    """Adjust key to exactly 16 characters for AES-128"""
+    if len(key) != 16:
+        print("Warning: Key should be exactly 16 characters for AES-128")
+        if len(key) < 16:
+            key = key.ljust(16, '0')  # Pad with zeros
+        else:
+            key = key[:16]  # Truncate to 16 characters
+        print(f"Adjusted key: {key}")
+    return key
+
+
 server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 server_socket.bind(('localhost', 12345))
 server_socket.listen(1)
@@ -486,19 +559,30 @@ server_socket.listen(1)
 conn, addr = server_socket.accept()
 print(f"Connection established with {addr}")
 
-# while True:
+# Receive encrypted message from client
 encrypted_message = conn.recv(1024).decode()
-
 print(f"Encrypted message received from client: {encrypted_message}")
-key = input("Enter the key to decrypt the message: ").strip()
-keys = roundkeygen(str2hex(key))
-plaintext = decrypt(encrypted_message, keys)
-print(f"Decrypted message: {hex2str(plaintext)}")
 
+# Get decryption key
+key = input("Enter the key to decrypt the message: ").strip()
+
+# Validate and adjust key length (same as client)
+key = adjust_key_length(key)
+
+# Decrypt the message using multi-block decryption
+try:
+    plaintext = decrypt_multi_block(encrypted_message, key)
+    print(f"Decrypted message: {plaintext}")
+except Exception as e:
+    print(f"Decryption failed: {e}")
+    plaintext = "Decryption failed"
+
+# Get reply message
 reply = input("Enter reply to send to client: ").strip()
 
-reply_cipher = encrypt(str2hex(reply), keys)
-conn.sendall((reply_cipher).encode())
+# Encrypt reply using multi-block encryption
+reply_cipher = encrypt_multi_block(reply, key)
+conn.sendall(reply_cipher.encode())
 print(f"Encrypted reply sent to client: {reply_cipher}")
 
 conn.close()
